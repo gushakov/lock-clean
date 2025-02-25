@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: lock-clean
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath*:schema.sql
+
+logging:
+  level:
+    sql: debug
