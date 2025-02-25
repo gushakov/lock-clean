@@ -29,7 +29,7 @@ import java.util.List;
 @DataJdbcTest
 @Rollback(false) // set to "false", if we want to inspect the results in the database
 @FieldDefaults(level = AccessLevel.PRIVATE)
-class OptimisticLockTest {
+class OptimisticLockTestIT {
 
     // set up and run a Testcontainer for Postgres database
     @SpringBootConfiguration
