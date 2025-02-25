@@ -67,7 +67,7 @@ class OptimisticLockTestIT {
     @Test
     void create_course_save_it_twice_version_must_be_updated() {
 
-        String courseId = idGenerator.generateCourseId();
+        String courseId = idGenerator.generateNewCourseId().asString();
 
         // create a course DB entity
         CourseDbEntity newCourse = CourseDbEntity.builder()
@@ -100,7 +100,7 @@ class OptimisticLockTestIT {
     @Test
     void count_subscriptions_by_course_id() {
 
-        String courseId = idGenerator.generateCourseId();
+        String courseId = idGenerator.generateNewCourseId().asString();
 
         CourseDbEntity course = CourseDbEntity.builder()
                 .id(courseId)
@@ -108,15 +108,16 @@ class OptimisticLockTestIT {
                 .build();
         courseRepo.save(course);
 
-        String studentId = idGenerator.generateStudentId();
+        String studentId = idGenerator.generateNewStudentId().asString();
         StudentDbEntity student = StudentDbEntity.builder()
                 .id(studentId)
                 .fullName("Name of %s".formatted(studentId))
                 .build();
         studentRepo.save(student);
 
+        String subscriptionId = idGenerator.generateNewSubscriptionId().asString();
         SubscriptionDbEntity subscription = SubscriptionDbEntity.builder()
-                .id(idGenerator.generateSubscriptionId())
+                .id(subscriptionId)
                 .studentId(studentId)
                 .courseId(courseId)
                 .optional(false)
