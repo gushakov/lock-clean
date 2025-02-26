@@ -64,6 +64,7 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
 
             if (numberOfCoursesForStudent >= STUDENT_SUBSCRIPTIONS_LIMIT) {
                 presenter.presentWarningIfStudentSubscriptionsLimitIsExceeded(student);
+                return;
             }
 
             // we have passed all the rules and can create a new subscription aggregate instance
