@@ -5,11 +5,11 @@ import com.github.lockclean.core.model.course.CourseId;
 import com.github.lockclean.core.model.student.StudentId;
 import com.github.lockclean.core.model.subscription.SubscriptionId;
 import com.github.lockclean.core.port.id.IdsOperationsOutputPort;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 
-@Component
+@Service
 public class JNanoIdGenerator implements IdsOperationsOutputPort {
 
     private static final char[] ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();

@@ -45,11 +45,15 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
              */
 
             if (numberOfCourseSubscribers >= course.getCapacity()) {
-                throw new CourseSubscriptionsCapacityExceededError(courseId, course.getCapacity());
+                presenter.presentWarningIfCourseCapacityIsExceeded(course);
+                return;
             }
 
             // query persistence store for the number of courses the student is currently subscribed for
             int numberOfCoursesForStudent = persistenceOps.countNumberOfCoursesSubscribedForByStudent(studentId);
+
+            // obtain the student (aggregate) from the database
+            Student student = persistenceOps.obtainStudentById(studentId);
 
             /*
                 POINT OF INTEREST
@@ -59,11 +63,8 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
              */
 
             if (numberOfCoursesForStudent >= STUDENT_SUBSCRIPTIONS_LIMIT) {
-                throw new StudentSubscriptionsLimitExceededError(studentId);
+                presenter.presentWarningIfStudentSubscriptionsLimitIsExceeded(student);
             }
-
-            // obtain the student (aggregate) from the database
-            Student student = persistenceOps.obtainStudentById(studentId);
 
             // we have passed all the rules and can create a new subscription aggregate instance
             Subscription subscription = Subscription.builder()
@@ -96,11 +97,26 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
                     // save subscription
                     persistenceOps.saveSubscription(subscription);
                 } catch (ConcurrentPersistenceEntityAccessError e) {
-                    // TODO: implement
+
+                    /*
+                        POINT OF INTEREST
+                        -----------------
+                        At this point we have detected that an entity involved in subscription
+                        has been modified by a different thread. We should not probably
+                        create the subscription and notify the user of this fact. Note,
+                        that since one of the gateway methods threw the exception, the rollback
+                        of the current transaction has already been initiated.
+                     */
+                    txOps.doAfterRollback(() -> presenter.presentErrorOnConcurrentAccessToSubscriptionRelatedEntities(course,
+                            student, subscription));
+                    return;
+
                 }
 
-            });
+                // this will be executed if subscription was successfully created
+                txOps.doAfterCommit(() -> presenter.presentSuccessfulResultOfSubscribingStudentToCourse(student, course));
 
+            });
 
         } catch (Exception e) {
             presenter.presentError(e);
