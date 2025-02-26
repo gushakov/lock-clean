@@ -1,10 +1,13 @@
 spring:
-  application:
-    name: lock-clean
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath*:schema.sql
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: "jdbc:postgresql://localhost:5432/lockdb"
+    username: postgres
+    password: postgres
+    hikari:
+      connection-timeout: 5000
+  flyway:
+    schemas: public
 
 logging:
   level:
