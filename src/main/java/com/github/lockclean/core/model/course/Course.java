@@ -17,12 +17,15 @@ public class Course {
 
     String title;
 
+    Integer capacity;
+
     Integer version;
 
     @Builder
-    public Course(CourseId id, String title, Integer version) {
+    public Course(CourseId id, String title, Integer capacity, Integer version) {
         this.id = Validator.notNull(id);
         this.title = Validator.notNullOrBlank(title);
+        this.capacity = Validator.strictlyPositive(capacity);
         this.version = version;
     }
 }

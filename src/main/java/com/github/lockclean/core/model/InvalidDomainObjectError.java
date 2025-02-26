@@ -1,6 +1,8 @@
 package com.github.lockclean.core.model;
 
-public class InvalidDomainObjectError extends RuntimeException {
+import com.github.lockclean.core.GenericLockCleanError;
+
+public class InvalidDomainObjectError extends GenericLockCleanError {
     public InvalidDomainObjectError(String message) {
         super(message);
     }

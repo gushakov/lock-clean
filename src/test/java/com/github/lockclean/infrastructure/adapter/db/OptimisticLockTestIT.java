@@ -73,6 +73,7 @@ class OptimisticLockTestIT {
         CourseDbEntity newCourse = CourseDbEntity.builder()
                 .id(courseId)
                 .title("Latin 101")
+                .capacity(20)
                 .build();
 
         // save course
@@ -105,6 +106,7 @@ class OptimisticLockTestIT {
         CourseDbEntity course = CourseDbEntity.builder()
                 .id(courseId)
                 .title("Title of %s".formatted(courseId))
+                .capacity(20)
                 .build();
         courseRepo.save(course);
 

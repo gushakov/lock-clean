@@ -16,4 +16,10 @@ public class Validator {
                 .orElseThrow(() -> new InvalidDomainObjectError("String attribute must not be null or blank"));
     }
 
+    public static Integer strictlyPositive(Integer attribute) {
+        return Optional.ofNullable(attribute)
+                .filter(number -> number > 0)
+                .orElseThrow(() -> new InvalidDomainObjectError("Integer attribute must be strictly positive"));
+    }
+
 }

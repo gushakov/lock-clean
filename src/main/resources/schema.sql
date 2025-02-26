@@ -2,6 +2,7 @@ CREATE TABLE public.course
 (
     id        varchar NOT NULL,
     title     varchar NOT NULL,
+    capacity  int     NOT NULL,
     "version" int NULL,
     CONSTRAINT course_pk PRIMARY KEY (id)
 );

@@ -21,6 +21,9 @@ public class CourseDbEntity {
     @Column("title")
     String title;
 
+    @Column("capacity")
+    Integer capacity;
+
     @Version
     Integer version;
 }
