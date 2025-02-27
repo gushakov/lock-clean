@@ -41,6 +41,13 @@ public class PersistenceGateway implements PersistenceOperationsOutputPort {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean subscriptionExistsAlready(StudentId studentId, CourseId courseId) {
+        return subscriptionRepo.existsByStudentIdAndCourseId(dbEntityMapper.convertStudentIdToString(studentId),
+                dbEntityMapper.convertCourseIdToString(courseId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public int countNumberOfSubscribersToCourse(CourseId courseId) {
         try {
             return subscriptionRepo.countByCourseId(dbEntityMapper.convertCourseIdToString(courseId));

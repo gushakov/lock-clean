@@ -1,19 +1,20 @@
 package com.github.lockclean.infrastructure;
 
 import com.github.lockclean.core.model.course.Course;
+import com.github.lockclean.core.model.course.CourseId;
 import com.github.lockclean.core.model.student.Student;
+import com.github.lockclean.core.model.student.StudentId;
 import com.github.lockclean.core.model.subscription.Subscription;
 import com.github.lockclean.core.usecase.subscribestudent.SubscribeStudentInputPort;
 import com.github.lockclean.core.usecase.subscribestudent.SubscribeStudentPresenterOutputPort;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Presenter for testing "subscribe student" use case. Will output messages to console
  * during presentation.
  */
-public class SubscribeStudentPresenter implements SubscribeStudentPresenterOutputPort {
-    private static final Logger log = LoggerFactory.getLogger(SubscribeStudentPresenter.class);
+@Slf4j
+public class SubscribeStudentLoggingPresenter implements SubscribeStudentPresenterOutputPort {
 
     @Override
     public void presentErrorOnConcurrentAccessToSubscriptionRelatedEntities(Course course, Student student, Subscription subscription) {
@@ -36,11 +37,12 @@ public class SubscribeStudentPresenter implements SubscribeStudentPresenterOutpu
     @Override
     public void presentSuccessfulResultOfSubscribingStudentToCourse(Student student, Course course) {
         log.info("Successfully subscribed student with ID {} to course with ID {}", student.getId().asString(),
-                course.getId().toString());
+                course.getId().asString());
     }
 
     @Override
-    public void presentError(Exception e) {
-        log.error("Some unknown error has occurred", e);
+    public void presentWarningIfSubscriptionExistsAlready(StudentId studentId, CourseId courseId) {
+        log.warn("Student with ID {} is already subscribed to course with ID {}", studentId.asString(), courseId.asString());
     }
+
 }

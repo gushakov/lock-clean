@@ -7,6 +7,9 @@ import com.github.lockclean.core.model.student.StudentId;
 import com.github.lockclean.core.model.subscription.Subscription;
 
 public interface PersistenceOperationsOutputPort {
+
+    boolean subscriptionExistsAlready(StudentId studentId, CourseId courseId);
+
     int countNumberOfSubscribersToCourse(CourseId courseId);
 
     Course obtainCourseById(CourseId courseId);

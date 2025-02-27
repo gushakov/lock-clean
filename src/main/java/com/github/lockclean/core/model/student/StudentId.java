@@ -15,7 +15,7 @@ public class StudentId {
         this.id = Validator.notNullOrBlank(id);
     }
 
-    public String asString(){
+    public String asString() {
         return id;
     }
 }

@@ -7,7 +7,9 @@ import com.github.lockclean.core.model.subscription.SubscriptionId;
 public interface IdsOperationsOutputPort {
 
     CourseId generateNewCourseId();
+
     StudentId generateNewStudentId();
+
     SubscriptionId generateNewSubscriptionId();
 
 }

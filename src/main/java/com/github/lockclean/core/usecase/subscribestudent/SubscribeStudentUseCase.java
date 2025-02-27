@@ -30,6 +30,16 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
             CourseId courseId = new CourseId(courseIdArg);
             StudentId studentId = new StudentId(studentIdArg);
 
+            /*
+                POINT OF INTEREST
+                -----------------
+                We need to make sure that we do not create a duplicate subscription.
+             */
+            if (persistenceOps.subscriptionExistsAlready(studentId, courseId)) {
+                presenter.presentWarningIfSubscriptionExistsAlready(studentId, courseId);
+                return;
+            }
+
             // obtain the course (aggregate) from the database
             Course course = persistenceOps.obtainCourseById(courseId);
 
