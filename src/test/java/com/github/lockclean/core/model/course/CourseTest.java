@@ -2,7 +2,6 @@ package com.github.lockclean.core.model.course;
 
 import com.github.lockclean.core.model.InvalidDomainObjectError;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;

@@ -41,21 +41,20 @@ class SubscribeStudentTestIT {
     @Test
     void register_new_course() {
         registerCourseUseCase().registerCourse("Latin 102", 20);
+        // create a new course and look up its ID from the database
     }
 
     @Test
     void register_new_student() {
         registerStudentUseCase().registerStudent("George Clooney");
+        // register a new student and look up its ID from the database
     }
 
     @Test
     void subscribe_student_to_course() {
 
-        /*
-            We can see the IDs for courses and students in the database.
-         */
-
-        subscribeStudentUseCase().subscribeStudentToCourse("stu_mwAW55", "crs_YhDCjy", false);
+        // run the test and try to modify "version" column of the course in the database
+        subscribeStudentUseCase().subscribeStudentToCourse("stu_KCpVjR", "crs_rsI0am", false);
     }
 
     // these methods will get prototype beans for each use case from the application context

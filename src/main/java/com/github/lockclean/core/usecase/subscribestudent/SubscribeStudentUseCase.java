@@ -95,16 +95,33 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
                 that the optimal concurrency lock on our aggregates will be detected
                 in the case of contention for the same aggregate instances by different
                 threads running this use case in parallel.
+
+                To simulate the case of contention we can pause the current thread
+                for several minutes so that we have a chance to edit "version"
+                of an involved aggregate in the database manually.
              */
+
+            // uncomment to pause before the new subscription is saved in the database
+            // Thread.sleep(java.time.Duration.ofSeconds(30));
 
             // start a new (read-write) transaction for saving all related aggregates
             txOps.doInTransaction(false, () -> {
 
                 try {
+
+                    /*
+                        POINT OF INTEREST
+                        -----------------
+                        We can comment the lines saving course and student to see what effect
+                        it will have on the execution of the use case when we manually change
+                        "version" of the related aggregates in the database.
+                     */
+
                     // save course
                     persistenceOps.saveCourse(course);
                     // save student
                     persistenceOps.saveStudent(student);
+
                     // save subscription
                     persistenceOps.saveSubscription(subscription);
                 } catch (ConcurrentPersistenceEntityAccessError e) {
