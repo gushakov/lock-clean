@@ -139,6 +139,43 @@ from the reference projects (`port/db`, `PersistenceGateway`, `obtain*`,
 renaming would break the correspondence between the public text and the code — plus
 the absence of an ArchUnit guard and of a composition root.
 
+## Where the re-save technique stands (conclusion of 2026-10-05)
+
+What the current solution provides: **inter-aggregate rules enforced strongly inside a
+use case, within one store, without a super-aggregate** — and with the transaction port
+and adapter exactly as they are. The re-save of an unchanged aggregate is optimistic
+concurrency control over the read set (JPA's `OPTIMISTIC_FORCE_INCREMENT`, the
+"promotion" of Fekete et al.); it needs nothing from the store beyond compare-and-swap
+on one row, so it is isolation-level and vendor independent.
+
+- **Which aggregates to re-save.** Every aggregate whose values the decision read
+  (read validation: capacity may have changed), *and* every aggregate that stands for a
+  predicate the decision read (conflict materialisation: two subscriptions to the same
+  course write disjoint rows and collide only because both bump the course). The second
+  reason holds even if capacity never changes; the counts are the reads that get
+  forgotten.
+- **Caveat — not a hot-row answer.** Peers deciding on the same course serialize on its
+  row: one winner per round, the rest retry. A genuinely contended counter wants a
+  pessimistic lock or a stored counter, not optimistic retry; the batch actor is what
+  makes retry acceptable here.
+- **Caveat — the invariant catalogue must be documented.** The predicate coverage is a
+  write-side protocol: every future writer of a subscription must touch the same course
+  and student rows. No test of this use case can catch the one that does not. The
+  catalogue of rules, their supports and their designated rows lives in prose
+  (§Doctrine above), not in the type system.
+- **Accepted coarseness.** The row version is coarser than the rule's support, so a
+  title edit also defeats a subscription. If that ever bites, the remedy is to cut
+  aggregates along invariant supports (a capacity/enrollment aggregate apart from the
+  course's description), not to change the mechanism.
+
+Examined and set aside for now: a decision-scope policy in the adapter (touch / row lock /
+serializable behind one port); a SERIALIZABLE-isolation adapter with all reads inside the
+transaction (correct on Postgres only if *every* writer of the support is serializable too,
+and with no index on `subscription(course_id, student_id)` the counts take relation-level
+predicate locks, so every concurrent subscription conflicts with every other); and a
+separate version table keyed by named column sets ("decision drivers"), the finest grain
+and the explicit catalogue, at the price of a registry and extra writes per transaction.
+
 ## Open threads
 
 1. Whether the duplicate-subscription guard should also exist as a database unique
