@@ -7,7 +7,7 @@ public class PersistenceOperationError extends GenericLockCleanError {
         super(message);
     }
 
-    public PersistenceOperationError(Exception e) {
-        super(e);
+    public PersistenceOperationError(String message, Throwable cause) {
+        super(message, cause);
     }
 }

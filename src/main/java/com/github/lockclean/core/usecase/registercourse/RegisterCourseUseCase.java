@@ -20,14 +20,16 @@ public class RegisterCourseUseCase implements RegisterCourseInputPort {
     public void registerCourse(String title, int capacity) {
         try {
 
-            // start read-write transaction
-            txOps.doInTransaction(false, () -> {
-                // create new instance of a course aggregate and save it
-                Course course = Course.builder()
-                        .id(idsOps.generateNewCourseId())
-                        .title(title)
-                        .capacity(capacity)
-                        .build();
+            // create new instance of a course aggregate
+            Course course = Course.builder()
+                    .id(idsOps.generateNewCourseId())
+                    .title(title)
+                    .capacity(capacity)
+                    .build();
+
+            // save it in a read-write transaction; a fresh aggregate has no version to
+            // lose a race on, so any error here is a genuine fault and propagates
+            txOps.doInTransaction(() -> {
                 persistenceOps.saveCourse(course);
                 txOps.doAfterCommit(() -> presenter.presentSuccessfulResultOfRegisteringNewCourse(course));
             });
