@@ -5,7 +5,6 @@ import com.github.lockclean.core.model.course.CourseId;
 import com.github.lockclean.core.model.student.Student;
 import com.github.lockclean.core.model.student.StudentId;
 import com.github.lockclean.core.model.subscription.Subscription;
-import com.github.lockclean.core.port.db.ConcurrentPersistenceEntityAccessError;
 import com.github.lockclean.core.port.db.PersistenceOperationsOutputPort;
 import com.github.lockclean.core.port.id.IdsOperationsOutputPort;
 import com.github.lockclean.core.port.transaction.TransactionOperationsOutputPort;
@@ -90,61 +89,36 @@ public class SubscribeStudentUseCase implements SubscribeStudentInputPort {
                 -----------------
                 Just saving our new subscription here will not exclude a possibility
                 of multiple concurrent threads creating subscriptions which do not
-                uphold the business rules. We also need to save the related course
-                and student aggregate instances as well. Only this will guarantee
-                that the optimal concurrency lock on our aggregates will be detected
-                in the case of contention for the same aggregate instances by different
-                threads running this use case in parallel.
+                uphold the business rules: a new row carries no version to check.
+                We also save the related course and student aggregate instances,
+                unchanged, in the same transaction. Their "version" columns are then
+                checked and bumped, so a concurrent thread that touched the same
+                course or student since we read them loses on one of these writes.
 
-                To simulate the case of contention we can pause the current thread
-                for several minutes so that we have a chance to edit "version"
-                of an involved aggregate in the database manually.
+                Any of the three saves may be the losing one. The persistence gateway
+                raises OptimisticLockingError, the rest of the lambda is skipped, the
+                transaction adapter rolls back and then runs the handler passed as
+                the second argument. The handler presents the outcome as a warning;
+                this call is the interaction's terminal act, so nothing presents twice.
+
+                We can comment the lines saving course and student to see that the
+                race is then no longer detected.
              */
 
-            // uncomment to pause before the new subscription is saved in the database
-            // Thread.sleep(java.time.Duration.ofSeconds(30));
+            // one read-write transaction for saving all related aggregates
+            txOps.doInTransaction(() -> {
 
-            // start a new (read-write) transaction for saving all related aggregates
-            txOps.doInTransaction(false, () -> {
+                // save course and student (unchanged) — their versions are the lock
+                persistenceOps.saveCourse(course);
+                persistenceOps.saveStudent(student);
 
-                try {
+                // save the new subscription
+                persistenceOps.saveSubscription(subscription);
 
-                    /*
-                        POINT OF INTEREST
-                        -----------------
-                        We can comment the lines saving course and student to see what effect
-                        it will have on the execution of the use case when we manually change
-                        "version" of the related aggregates in the database.
-                     */
-
-                    // save course
-                    persistenceOps.saveCourse(course);
-                    // save student
-                    persistenceOps.saveStudent(student);
-
-                    // save subscription
-                    persistenceOps.saveSubscription(subscription);
-                } catch (ConcurrentPersistenceEntityAccessError e) {
-
-                    /*
-                        POINT OF INTEREST
-                        -----------------
-                        At this point we have detected that an entity involved in subscription
-                        has been modified by a different thread. We should not probably
-                        create the subscription and notify the user of this fact. Note,
-                        that since one of the gateway methods threw the exception, the rollback
-                        of the current transaction has already been initiated.
-                     */
-                    txOps.doAfterRollback(() -> presenter.presentErrorOnConcurrentAccessToSubscriptionRelatedEntities(course,
-                            student, subscription));
-                    return;
-
-                }
-
-                // this will be executed if subscription was successfully created
+                // this will be executed only once the subscription has been committed
                 txOps.doAfterCommit(() -> presenter.presentSuccessfulResultOfSubscribingStudentToCourse(student, course));
 
-            });
+            }, () -> presenter.presentWarningIfConcurrentModificationWasDetected(course, student));
 
         } catch (Exception e) {
             presenter.presentError(e);

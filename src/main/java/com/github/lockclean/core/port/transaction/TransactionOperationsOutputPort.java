@@ -1,85 +1,97 @@
 package com.github.lockclean.core.port.transaction;
 
+import java.util.function.Supplier;
+
 /**
- * Port for transactional demarcation of persistence operations.
+ * Driven (output) port for explicit transaction demarcation. A use case calls it to run its
+ * persistence writes inside a narrow transaction and to defer presentation until the transaction
+ * actually commits — instead of wrapping the whole interaction in a blanket {@code @Transactional}.
+ *
+ * <p>The shape is deliberately lean:
+ * <ul>
+ *   <li><b>Validation and reads happen outside</b> {@code doInTransaction}; only persistence writes
+ *       need the consistency boundary inside it.</li>
+ *   <li><b>Presentation happens after commit</b> via {@link #doAfterCommit(Runnable)}, so the actor
+ *       is never told an operation succeeded while the transaction might still roll back.</li>
+ *   <li><b>Failure is expressed by throwing</b> — an unchecked error thrown inside the action rolls
+ *       the transaction back and propagates to the use case's single outermost checkpoint. There is
+ *       deliberately no {@code rollback()} method and no after-rollback hook.</li>
+ *   <li><b>The machinery has its own failure currency</b> — a fault in <em>demarcation</em> (begin,
+ *       commit, or unexpected rollback), as opposed to a fault in the action, surfaces as a
+ *       {@link TransactionOperationsError}. The adapter translates the underlying framework exception
+ *       so the use case never catches a raw transaction exception.</li>
+ * </ul>
+ *
+ * <p>Actions are plain {@link Runnable} / {@link Supplier}: persistence ports raise <em>unchecked</em>
+ * errors (see {@code PersistenceOperationError}), so no checked-exception plumbing is needed and a
+ * thrown error triggers Spring's default rollback-on-runtime.
  */
 public interface TransactionOperationsOutputPort {
 
     /**
-     * Rolls back any current transaction. Does nothing if not called in
-     * a transactional context.
+     * Convenience overload for a read-write transaction.
      */
-    void rollback();
-
-    /**
-     * @see #doInTransaction(boolean, TransactionRunnableWithoutResult)
-     */
-    default void doInTransaction(TransactionRunnableWithoutResult runnableWithoutResult) {
-        doInTransaction(false, runnableWithoutResult);
+    default void doInTransaction(Runnable action) {
+        doInTransaction(false, action);
     }
 
     /**
-     * Always executes the provided runnable. Makes sure the runnable is executed
-     * within the currently active transaction if any is available.
+     * Runs {@code action} inside a transaction (joining the current one if any is active).
      *
-     * @param readOnly              set to {@code true} if transaction is read-only
-     * @param runnableWithoutResult a runnable which does not return anything
+     * @param readOnly {@code true} for a read-only transaction
      */
-    void doInTransaction(boolean readOnly, TransactionRunnableWithoutResult runnableWithoutResult);
+    void doInTransaction(boolean readOnly, Runnable action);
 
     /**
-     * @see #doInTransactionWithResult(boolean, TransactionRunnableWithResult)
+     * Runs {@code action} inside a read-write transaction, routing an optimistic-lock loss to a handler
+     * instead of letting it propagate. If one of the action's versioned writes loses a concurrent race,
+     * the adapter has already rolled the transaction back; it then catches the resulting
+     * {@code OptimisticLockingError} (the {@code core.port.concurrency} type) and runs
+     * {@code onLockDetected} rather than rethrowing — a lost race is an expected concurrency outcome,
+     * not a fault. Always read-write: a read-only transaction issues no versioned write, so there is no
+     * lock to detect.
+     *
+     * <p>This is an <b>opt-in idiom in addition to</b>, not a replacement for, the propagating error: the
+     * other {@code doInTransaction} overloads (and a {@code null} handler here) still let
+     * {@code OptimisticLockingError} reach the use case's outermost checkpoint. Its advantage is that it
+     * <b>co-locates the reaction with the very block that can lose</b>.
+     *
+     * <p><b>Discipline — a presenting handler must be the interaction's terminal act.</b> Unlike a
+     * propagating error (which unwinds the whole interaction, guaranteeing exactly-once presentation),
+     * this handler <em>swallows</em> the error and returns control to the caller, which continues past
+     * this call. So if {@code onLockDetected} presents an outcome, this {@code doInTransaction} must be
+     * the interaction's last act, or a later statement could present a second time.
      */
-    default <R> R doInTransactionWithResult(TransactionRunnableWithResult<R> runnableWithResult) {
-        return doInTransactionWithResult(false, runnableWithResult);
+    void doInTransaction(Runnable action, Runnable onLockDetected);
+
+    /**
+     * Convenience overload for a read-write transaction returning a result.
+     */
+    default <T> T doInTransactionWithResult(Supplier<T> action) {
+        return doInTransactionWithResult(false, action);
     }
 
     /**
-     * Always executes the provided runnable returning the result of the execution. Makes sure
-     * the runnable is executed within the currently active transaction if any is available.
+     * Runs {@code action} inside a transaction and returns its result (joining the current
+     * transaction if any is active).
      *
-     * @param <R>                any type
-     * @param readOnly           set to {@code true} if transaction is read-only
-     * @param runnableWithResult a runnable with some return object
-     * @return object returned by the runnable
+     * @param readOnly {@code true} for a read-only transaction
      */
-    <R> R doInTransactionWithResult(boolean readOnly, TransactionRunnableWithResult<R> runnableWithResult);
+    <T> T doInTransactionWithResult(boolean readOnly, Supplier<T> action);
 
     /**
-     * Executes the provided runnable if called outside any transactional context. Otherwise, executes
-     * the runnable only after a successful commit of the current transaction.
+     * Registers {@code action} to run after the current transaction commits. If no transaction is
+     * active, runs it immediately (there is nothing to wait for).
      *
-     * @param runnableWithoutResult a runnable which does not return anything
-     */
-    void doAfterCommit(TransactionRunnableWithoutResult runnableWithoutResult);
-
-    /**
-     * Executes the provided runnable, returning the result of the execution, if called outside
-     * any transactional context. Otherwise, executes the runnable only after a successful
-     * commit of the current transaction.
+     * <p><b>The hook fails loudly — whatever the action throws, the caller sees.</b> Both branches share
+     * that one contract: the immediate branch throws from this very call, and the deferred branch throws
+     * from the enclosing {@link #doInTransaction(boolean, Runnable)} (the transaction having committed),
+     * where the use case's outermost checkpoint catches it. This is deliberately <em>not</em> a
+     * fire-and-forget notification: the actor is never told "success" before the commit, <em>and</em>
+     * never told "success" when the deferred act itself failed.
      *
-     * @param runnableWithResult a runnable with some return object
-     * @param <R>                any type
-     * @return object returned by the runnable
+     * <p>Callbacks queued behind a throwing one are skipped, so when a deferred block both signals an
+     * external system and presents, statement order is load-bearing: the signal goes first.
      */
-    <R> R doAfterCommitWithResult(TransactionRunnableWithResult<R> runnableWithResult);
-
-    /**
-     * Executes the provided runnable if called outside any transactional context.
-     * Otherwise, executes the runnable only after the current transaction was rolled back.
-     *
-     * @param runnableWithoutResult a runnable which does not return anything
-     */
-    void doAfterRollback(TransactionRunnableWithoutResult runnableWithoutResult);
-
-    /**
-     * Executes the provided runnable, returning the result of the execution, if called outside
-     * any transactional context. Otherwise, executes the runnable only after the current
-     * transaction was rolled back.
-     *
-     * @param runnableWithResult a runnable with some return object
-     * @param <R>                any type
-     * @return object returned by the runnable
-     */
-    <R> R doAfterRollbackWithResult(TransactionRunnableWithResult<R> runnableWithResult);
+    void doAfterCommit(Runnable action);
 }
