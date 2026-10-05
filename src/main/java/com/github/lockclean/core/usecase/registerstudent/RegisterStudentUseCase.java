@@ -17,17 +17,19 @@ public class RegisterStudentUseCase implements RegisterStudentInputPort {
     PersistenceOperationsOutputPort persistenceOps;
     IdsOperationsOutputPort idsOps;
 
-
     @Override
     public void registerStudent(String fullName) {
 
         try {
-            // create new student aggregate instance and save it in a new read-write transaction
-            txOps.doInTransaction(false, () -> {
-                Student student = Student.builder()
-                        .id(idsOps.generateNewStudentId())
-                        .fullName(fullName)
-                        .build();
+            // create new student aggregate instance
+            Student student = Student.builder()
+                    .id(idsOps.generateNewStudentId())
+                    .fullName(fullName)
+                    .build();
+
+            // save it in a read-write transaction; a fresh aggregate has no version to
+            // lose a race on, so any error here is a genuine fault and propagates
+            txOps.doInTransaction(() -> {
                 persistenceOps.saveStudent(student);
                 txOps.doAfterCommit(() -> presenter.presentSuccessfulResultOfRegisteringNewStudent(student));
             });
